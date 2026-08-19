@@ -1,5 +1,5 @@
 /* ==========================================================================
-   EXTRA TIME RADIO — PERFECT AUTOPLAY + STRICT PAUSE ENGINE
+   EXTRA TIME RADIO — PERFECT SHUFFLE & CONTINUOUS AUTOPLAY ENGINE
    ========================================================================== */
 
 import { MOCK_TRACKS } from './mockData.js';
@@ -196,7 +196,7 @@ export class AudioEngine {
         break;
 
       case window.YT.PlayerState.ENDED:
-        console.log('[ET RADIO] natural track ended');
+        console.log('[ET RADIO] natural track ended -> playing next random shuffled track');
         if (!this.isUserPaused) {
           this.nextTrack();
         }
@@ -315,7 +315,7 @@ export class AudioEngine {
   }
 
   /* ------------------------------------------------------------------------
-     3. UNIFIED PLAYBACK CONTROLS
+     3. UNIFIED PLAYBACK CONTROLS (ALWAYS SHUFFLED RANDOM TRACKS)
      ------------------------------------------------------------------------ */
 
   async playTrack() {
@@ -385,21 +385,27 @@ export class AudioEngine {
   nextTrack() {
     if (this.isTransitioning) return;
     this.isTransitioning = true;
-    setTimeout(() => { this.isTransitioning = false; }, 1500);
+    setTimeout(() => { this.isTransitioning = false; }, 1200);
 
     const wasPlaying = (this.state === 'PLAYING');
 
     if (this.isYtReady && this.ytPlayer) {
       try {
         this.ytPlayer.setShuffle(true);
-        if (typeof this.ytPlayer.nextVideo === 'function') {
-          this.ytPlayer.nextVideo();
-        } else {
-          const randomIndex = Math.floor(Math.random() * 40);
-          this.ytPlayer.playVideoAt(randomIndex);
+        
+        // Pick a random playlist index from 0 to 45 to prevent track repetition
+        const playlistLength = 45;
+        let randomIndex = Math.floor(Math.random() * playlistLength);
+        if (this.ytPlayer.getPlaylistIndex) {
+          const currentIndex = this.ytPlayer.getPlaylistIndex();
+          if (randomIndex === currentIndex) {
+            randomIndex = (randomIndex + 1) % playlistLength;
+          }
         }
 
-        if (wasPlaying && !this.isUserPaused) {
+        this.ytPlayer.playVideoAt(randomIndex);
+
+        if (!this.isUserPaused) {
           setTimeout(() => {
             if (this.ytPlayer && this.ytPlayer.playVideo && !this.isUserPaused) {
               try {
@@ -409,7 +415,7 @@ export class AudioEngine {
               } catch (e) {}
             }
           }, 300);
-        } else if (this.isUserPaused) {
+        } else {
           setTimeout(() => {
             if (this.ytPlayer && this.ytPlayer.pauseVideo) {
               try { this.ytPlayer.pauseVideo(); } catch (e) {}
@@ -430,12 +436,14 @@ export class AudioEngine {
   prevTrack() {
     const wasPlaying = (this.state === 'PLAYING');
 
-    if (this.isYtReady && this.ytPlayer && this.ytPlayer.previousVideo) {
+    if (this.isYtReady && this.ytPlayer) {
       try {
         this.ytPlayer.setShuffle(true);
-        this.ytPlayer.previousVideo();
+        const playlistLength = 45;
+        let randomIndex = Math.floor(Math.random() * playlistLength);
+        this.ytPlayer.playVideoAt(randomIndex);
 
-        if (wasPlaying && !this.isUserPaused) {
+        if (!this.isUserPaused) {
           setTimeout(() => {
             if (this.ytPlayer && this.ytPlayer.playVideo && !this.isUserPaused) {
               this.ytPlayer.unMute();
@@ -443,7 +451,7 @@ export class AudioEngine {
               this.ytPlayer.playVideo();
             }
           }, 300);
-        } else if (this.isUserPaused) {
+        } else {
           setTimeout(() => {
             if (this.ytPlayer && this.ytPlayer.pauseVideo) {
               try { this.ytPlayer.pauseVideo(); } catch (e) {}
@@ -453,6 +461,7 @@ export class AudioEngine {
         return;
       } catch (e) {}
     }
+
     if (this.audio.currentTime > 3) {
       this.seekTo(0);
       return;
