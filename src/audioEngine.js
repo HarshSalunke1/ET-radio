@@ -1,5 +1,5 @@
 /* ==========================================================================
-   EXTRA TIME RADIO — AUDIO ENGINE (STRICT USER-PAUSE PRIORITY FIX)
+   EXTRA TIME RADIO — PERFECT AUTOPLAY + STRICT PAUSE ENGINE
    ========================================================================== */
 
 import { MOCK_TRACKS } from './mockData.js';
@@ -11,7 +11,7 @@ export class AudioEngine {
 
     // State machine: IDLE | LOADING | PLAYING | PAUSED | ERROR
     this.state = 'IDLE';
-    this.isUserPaused = false; // Strict User Pause Priority Flag
+    this.isUserPaused = false; // Set to true ONLY when user clicks Pause
     this.hasInitialAutoplayAttempted = false;
 
     this.currentMood = 'pre-match';
@@ -47,24 +47,30 @@ export class AudioEngine {
     this.initGlobalUnmuteListeners();
   }
 
-  /* Unmute handler for initial user interaction (NEVER overrides isUserPaused) */
+  /* Unmute and trigger playback on initial site open/gesture (Blocked when isUserPaused is true) */
   initGlobalUnmuteListeners() {
     const unmuteHandler = () => {
       const enterBtn = document.getElementById('enterRadioBtn');
       if (enterBtn) enterBtn.style.display = 'none';
 
-      // If the user manually paused, DO NOT auto-resume on mousemove/scroll!
+      // IF USER MANUALLY PAUSED, ABSOLUTELY DO NOT AUTOPLAY!
       if (this.isUserPaused) return;
 
       if (this.ytPlayer) {
         try {
           if (this.ytPlayer.unMute) this.ytPlayer.unMute();
           if (this.ytPlayer.setVolume) this.ytPlayer.setVolume(Math.round(this.volume * 100));
+          if (this.ytPlayer.playVideo && this.state !== 'PLAYING') {
+            this.ytPlayer.playVideo();
+          }
         } catch (e) {}
       }
       if (this.audio) {
         this.audio.muted = false;
         this.audio.volume = this.volume;
+        if (this.state !== 'PLAYING') {
+          this.audio.play().catch(() => {});
+        }
       }
     };
 
@@ -113,7 +119,7 @@ export class AudioEngine {
           listType: 'playlist',
           list: this.playlistId,
           autoplay: 1,
-          mute: 1, // Start muted to bypass browser autoplay restrictions 100%
+          mute: 1, // Muted start to 100% bypass Chrome autoplay restriction
           controls: 0,
           disablekb: 1,
           fs: 0,
@@ -147,7 +153,7 @@ export class AudioEngine {
 
       this.ytPlayer.setShuffle(true);
 
-      // Only autoplay if user has NOT manually paused
+      // Autoplay immediately on site open unless user manually paused
       if (!this.isUserPaused) {
         this.ytPlayer.mute();
         this.ytPlayer.playVideo();
@@ -180,7 +186,6 @@ export class AudioEngine {
 
       case window.YT.PlayerState.CUED:
       case 5:
-        // Only force playback if user has NOT manually paused
         if (!this.isUserPaused && this.ytPlayer && this.ytPlayer.playVideo) {
           try {
             this.ytPlayer.unMute();
@@ -200,7 +205,7 @@ export class AudioEngine {
   }
 
   onYtPlayerError(event) {
-    console.warn('[ET RADIO] autoplay blocked / YouTube error code:', event.data);
+    console.warn('[ET RADIO] YouTube Player error:', event.data);
     if (!this.isUserPaused) {
       this.nextTrack();
     }
@@ -310,11 +315,11 @@ export class AudioEngine {
   }
 
   /* ------------------------------------------------------------------------
-     3. UNIFIED PLAYBACK CONTROLS (USER PAUSE ALWAYS HAS PRIORITY)
+     3. UNIFIED PLAYBACK CONTROLS
      ------------------------------------------------------------------------ */
 
   async playTrack() {
-    // User explicitly triggered play
+    // User explicitly pressed play / site autoplaying on load
     this.isUserPaused = false;
 
     this.initWebAudio();
@@ -357,7 +362,7 @@ export class AudioEngine {
   }
 
   pauseTrack() {
-    // User explicitly pressed pause
+    // User explicitly clicked Pause
     this.isUserPaused = true;
     console.log('[ET RADIO] user clicked pause -> setting isUserPaused = true');
 
@@ -394,7 +399,6 @@ export class AudioEngine {
           this.ytPlayer.playVideoAt(randomIndex);
         }
 
-        // Only resume playback if it WAS playing and user has NOT paused
         if (wasPlaying && !this.isUserPaused) {
           setTimeout(() => {
             if (this.ytPlayer && this.ytPlayer.playVideo && !this.isUserPaused) {
@@ -495,9 +499,9 @@ export class AudioEngine {
     return this.isMuted;
   }
 
-  /* 3-Second Initial Autoplay Attempt (Obeys isUserPaused strictly) */
+  /* 2-Second Initial Autoplay Attempt (Obeys isUserPaused strictly) */
   scheduleAutoplay() {
-    console.log('[ET RADIO] initial autoplay attempt scheduled in 3s');
+    console.log('[ET RADIO] initial autoplay attempt scheduled in 2s');
     setTimeout(() => {
       if (!this.hasInitialAutoplayAttempted && !this.isUserPaused) {
         this.hasInitialAutoplayAttempted = true;
@@ -506,7 +510,7 @@ export class AudioEngine {
       } else {
         console.log('[ET RADIO] initial autoplay skipped because user paused or already attempted');
       }
-    }, 3000);
+    }, 2000);
   }
 
   /* Synthetic Audio Fallback */
