@@ -1,0 +1,660 @@
+/* ==========================================================================
+   EXTRA TIME RADIO — TRANSLUCENT GLASSMORPHISM MUSIC PLAYER DESIGN
+   ========================================================================== */
+
+:root {
+  /* Color Tokens per DESIGN.md & PRD.md */
+  --color-bg: #050706;
+  --color-text-main: #E8ECE9;
+  --color-text-secondary: #A2AAA5;
+  --color-text-muted: #737B76;
+  --color-accent: #7FAE8B;
+  --color-accent-soft: rgba(127, 174, 139, 0.18);
+  --color-accent-glow: rgba(127, 174, 139, 0.35);
+
+  /* Translucent Glass Surface Tokens */
+  --color-glass: rgba(20, 14, 12, 0.52);
+  --color-glass-border: rgba(255, 255, 255, 0.12);
+  --color-glass-hover: rgba(28, 18, 14, 0.65);
+
+  /* Typography */
+  --font-brand: 'Syne', 'Manrope', sans-serif;
+  --font-body: 'Inter', sans-serif;
+
+  /* Motion Timing Functions */
+  --ease-cinematic: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Reset & Global Base */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background-color: var(--color-bg);
+  color: var(--color-text-main);
+  font-family: var(--font-body);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ==========================================================================
+   1. ENVIRONMENTAL BACKGROUND SLIDESHOW / STILL WALLPAPER (REFINED BRIGHTNESS)
+   ========================================================================== */
+
+.slideshow-environment {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+  background-color: var(--color-bg);
+}
+
+.slideshow-layer {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  transform: scale(1.00);
+  transition: opacity 1.5s var(--ease-cinematic);
+  image-rendering: -webkit-optimize-contrast;
+  filter: contrast(1.05) brightness(1.10) saturate(1.08);
+}
+
+.slideshow-layer.active {
+  opacity: 1;
+}
+
+/* Refined Dark Overlay (rgba(0,0,0,0.22) - 10-15% lighter per specification) */
+.cinematic-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.22);
+  z-index: 2;
+}
+
+/* Refined Vignette (Layer 3 - Lighter Center for Subject Clarity) */
+.cinematic-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 50%, rgba(5, 7, 6, 0.00) 0%, rgba(5, 7, 6, 0.32) 75%, var(--color-bg) 100%);
+  z-index: 3;
+}
+
+/* Film Grain Texture (Layer 4) */
+.film-grain-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* ==========================================================================
+   2. VIEWPORT CONTAINER
+   ========================================================================== */
+
+.scene-viewport {
+  position: relative;
+  z-index: 10;
+  width: 100vw;
+  height: 100vh;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* ==========================================================================
+   3. TOP NAVIGATION HEADER
+   ========================================================================== */
+
+.top-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 40;
+  padding: 22px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  opacity: 0;
+  animation: fade-down 1.2s var(--ease-cinematic) forwards 0.2s;
+}
+
+/* Top Left: Clock Badge */
+.header-left {
+  display: flex;
+  align-items: center;
+}
+
+.clock-badge {
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.5px;
+  opacity: 0.85;
+}
+
+/* Top Center: Listening Indicator */
+.header-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.online-badge {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 4px 12px;
+  border-radius: 100px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--color-text-secondary);
+}
+
+.pulse-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background-color: var(--color-accent);
+  box-shadow: 0 0 8px var(--color-accent);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.8); opacity: 0.4; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Top Right: Secondary External Links */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pill-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--color-text-secondary);
+  padding: 5px 12px;
+  border-radius: 100px;
+  font-family: var(--font-body);
+  font-size: 10.5px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: all 0.2s var(--ease-cinematic);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pill-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--color-text-main);
+}
+
+/* ==========================================================================
+   4. BRAND TITLE TYPOGRAPHY (UPWARD POSITIONING & BREATHING ROOM)
+   ========================================================================== */
+
+.hero-brand {
+  position: fixed;
+  top: 34%;
+  left: 0;
+  width: 100vw;
+  transform: translateY(-50%);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 20;
+  padding: 0 16px;
+  opacity: 0;
+  animation: fade-down 1.4s var(--ease-cinematic) forwards 0.3s;
+}
+
+.hero-title-main {
+  font-family: var(--font-brand);
+  font-size: clamp(28px, 5.2vw, 56px);
+  font-weight: 900;
+  letter-spacing: 12px;
+  margin-right: -12px;
+  color: #FFFFFF;
+  line-height: 0.95;
+  text-shadow: 
+    0 10px 40px rgba(0, 0, 0, 0.8),
+    0 0 60px rgba(0, 0, 0, 0.4);
+}
+
+.hero-title-sub {
+  font-family: var(--font-brand);
+  font-size: clamp(22px, 4vw, 42px);
+  font-weight: 900;
+  letter-spacing: 16px;
+  margin-right: -16px;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 0.95;
+  margin-top: 4px;
+  text-shadow: 
+    0 10px 40px rgba(0, 0, 0, 0.8),
+    0 0 60px rgba(0, 0, 0, 0.4);
+}
+
+.hero-tagline {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 5px;
+  margin-right: -5px;
+  color: var(--color-text-secondary);
+  opacity: 0.85;
+  margin-top: 14px;
+  text-shadow: 0 4px 15px rgba(0, 0, 0, 0.8);
+}
+
+/* ==========================================================================
+   5. TRANSLUCENT GLASSMORPHISM MUSIC PLAYER (FLOATING OVER PHOTOGRAPH)
+   ========================================================================== */
+
+.player-wrapper {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  width: 90vw;
+  max-width: 660px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Enter ET Radio Button (Autoplay Fallback Prompt) */
+.enter-radio-btn {
+  background: rgba(127, 174, 139, 0.22);
+  border: 1px solid rgba(127, 174, 139, 0.45);
+  color: #FFFFFF;
+  padding: 8px 20px;
+  border-radius: 100px;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  transition: all 0.25s var(--ease-cinematic);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.enter-radio-btn:hover {
+  background: rgba(127, 174, 139, 0.38);
+  border-color: rgba(127, 174, 139, 0.7);
+  transform: scale(1.04);
+}
+
+/* Translucent Glass Capsule Player Bar per Refinement Specification */
+.pill-player {
+  width: 100%;
+  background: var(--color-glass);
+  backdrop-filter: blur(24px) saturate(110%);
+  -webkit-backdrop-filter: blur(24px) saturate(110%);
+  border: 1px solid var(--color-glass-border);
+  border-radius: 100px;
+  padding: 10px 20px 10px 12px;
+  box-shadow: 
+    0 18px 50px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  opacity: 0;
+  animation: fade-up 1.4s var(--ease-cinematic) forwards 0.4s;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+}
+
+.pill-player:hover {
+  background: var(--color-glass-hover);
+  border-color: rgba(255, 255, 255, 0.20);
+}
+
+/* Left: Artwork Circle */
+.artwork-wrapper {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.artwork-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+
+.pill-player.is-playing .artwork-thumb {
+  animation: slow-rotate 20s linear infinite;
+}
+
+@keyframes slow-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Center: Track Metadata, Waveform & Progress Track */
+.track-details-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.track-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.track-title {
+  font-family: var(--font-brand);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-text-main);
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-artist {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Subtle Audio-Reactive Waveform Canvas */
+.mid-waveform-canvas {
+  width: 100%;
+  height: 12px;
+  display: block;
+  opacity: 0.8;
+  margin: 1px 0;
+}
+
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.slider-track {
+  position: relative;
+  flex: 1;
+  height: 3.5px;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+}
+
+.slider-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 0%;
+  background-color: var(--color-text-main);
+  border-radius: 10px;
+  pointer-events: none;
+}
+
+.invisible-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  outline: none;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.invisible-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #FFF;
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
+}
+
+.time-readout {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Right: Pill Controls */
+.pill-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.btn-pill-icon {
+  background: none;
+  border: none;
+  color: var(--color-text-main);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.85;
+  transition: all 0.2s ease;
+}
+
+.btn-pill-icon:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+/* Circular Prominent Play Button */
+.btn-pill-play {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #FAF7EE;
+  color: #140F0C;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35);
+  transition: all 0.25s var(--ease-cinematic);
+}
+
+.btn-pill-play:hover {
+  background: #FFFFFF;
+  transform: scale(1.06);
+  box-shadow: 0 6px 20px rgba(255, 255, 255, 0.25);
+}
+
+.btn-pill-play:active {
+  transform: scale(0.96);
+}
+
+/* Inline Volume Slider */
+.volume-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-volume {
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-volume:hover {
+  color: var(--color-text-main);
+}
+
+.volume-track {
+  position: relative;
+  width: 60px;
+  height: 3.5px;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+}
+
+.volume-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 80%;
+  background-color: var(--color-text-main);
+  border-radius: 10px;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   KEYFRAME ANIMATIONS & RESPONSIVE DESIGN
+   ========================================================================== */
+
+@keyframes fade-down {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 768px) {
+  .top-header {
+    padding: 16px 20px;
+  }
+
+  .header-center {
+    display: none;
+  }
+
+  .hero-title-main {
+    font-size: clamp(24px, 6vw, 42px);
+    letter-spacing: 6px;
+    margin-right: -6px;
+  }
+
+  .hero-title-sub {
+    font-size: clamp(20px, 4.5vw, 32px);
+    letter-spacing: 10px;
+    margin-right: -10px;
+  }
+
+  .hero-tagline {
+    font-size: 8.5px;
+    letter-spacing: 3.5px;
+    margin-right: -3.5px;
+  }
+
+  .player-wrapper {
+    bottom: 16px;
+    width: 94vw;
+  }
+
+  .pill-player {
+    padding: 8px 14px 8px 10px;
+    gap: 10px;
+    border-radius: 30px;
+  }
+
+  .artwork-wrapper {
+    width: 40px;
+    height: 40px;
+  }
+
+  .track-title {
+    font-size: 12px;
+  }
+
+  .track-artist {
+    font-size: 10px;
+  }
+
+  .time-readout {
+    font-size: 9.5px;
+  }
+
+  .btn-pill-play {
+    width: 36px;
+    height: 36px;
+    font-size: 12px;
+  }
+
+  .volume-inline {
+    display: none;
+  }
+}

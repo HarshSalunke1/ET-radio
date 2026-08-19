@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EXTRA TIME RADIO — Football • Music • Extra Time</title>
+  <meta name="description" content="A quiet, atmospheric football radio station late at night. Immerse yourself in football photography, curated ambient soundscapes, and glass music design.">
+
+  <!-- Browser Tab Favicon Logo -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="alternate icon" href="/favicon.svg">
+
+  <!-- Editorial Fonts: Syne, Manrope, Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@600;700;800&family=Syne:wght@700;800;900&display=swap" rel="stylesheet">
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+  <!-- YouTube IFrame API Direct Load -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+
+  <!-- Hidden YouTube Music Player Engine -->
+  <div id="youtubeContainer" style="position: fixed; top: -9999px; left: -9999px; width: 1px; height: 1px; opacity: 0; pointer-events: none;" aria-hidden="true">
+    <div id="youtubePlayer"></div>
+  </div>
+
+  <!-- Full-Screen 4K Hero Collage Still Background -->
+  <div class="slideshow-environment" aria-hidden="true">
+    <div id="bgLayer1" class="slideshow-layer active"></div>
+    <div id="bgLayer2" class="slideshow-layer"></div>
+    
+    <!-- Atmospheric Overlays: Dark Overlay, Vignette, Film Grain -->
+    <div class="cinematic-overlay"></div>
+    <div class="cinematic-vignette"></div>
+    <div class="film-grain-overlay"></div>
+  </div>
+
+  <!-- Viewport Layout -->
+  <div class="scene-viewport">
+
+    <!-- Top Navigation Header -->
+    <header class="top-header">
+      
+      <!-- Top Left: Subtle Environmental Clock -->
+      <div class="header-left">
+        <span class="clock-badge" id="liveClock">3:04 PM</span>
+      </div>
+
+      <!-- Top Center: Understated Listener Indicator -->
+      <div class="header-center">
+        <div class="online-badge">
+          <span class="pulse-dot"></span>
+          <span>LISTENING NOW</span>
+        </div>
+      </div>
+
+      <!-- Top Right: Secondary External Links -->
+      <div class="header-right">
+        <a href="https://open.spotify.com" target="_blank" rel="noopener noreferrer" class="pill-btn">
+          <i class="fa-brands fa-spotify"></i> Spotify
+        </a>
+        <a href="https://music.youtube.com/playlist?list=PLZHNkTV1FW4c" target="_blank" rel="noopener noreferrer" class="pill-btn">
+          <i class="fa-brands fa-youtube"></i> YouTube Music
+        </a>
+      </div>
+
+    </header>
+
+    <!-- Center Brand Title (Breathing Room, Upward Positioning) -->
+    <section class="hero-brand">
+      <h1 class="hero-title-main">EXTRA TIME</h1>
+      <h2 class="hero-title-sub">RADIO</h2>
+      <p class="hero-tagline">FOOTBALL · MUSIC · EXTRA TIME</p>
+    </section>
+
+    <!-- Translucent Glassmorphism Music Player Bar -->
+    <main class="player-wrapper">
+
+      <!-- Tasteful Enter / Play Radio Button (Shown if browser restricts autoplay) -->
+      <button id="enterRadioBtn" class="enter-radio-btn" style="display: none;">
+        <i class="fa-solid fa-play"></i> ENTER ET RADIO
+      </button>
+      
+      <!-- Translucent Glass Capsule Player -->
+      <div class="pill-player" id="pillPlayer">
+        
+        <!-- Left: Circular Album Artwork Thumbnail -->
+        <div class="artwork-wrapper">
+          <img src="/backgrounds/hero-collage.jpg" alt="Track Artwork" class="artwork-thumb" id="artworkThumb" />
+        </div>
+
+        <!-- Center: Track Info, Waveform & Progress Track -->
+        <div class="track-details-col">
+          <div class="track-meta">
+            <h1 class="track-title" id="trackTitle">Waka Waka (This Time for Africa)</h1>
+            <p class="track-artist" id="trackArtist">Shakira • Official Anthem</p>
+          </div>
+          
+          <!-- Subtle Audio-Reactive Waveform Equalizer Canvas -->
+          <canvas id="waveformCanvas" class="mid-waveform-canvas" width="160" height="12" title="Audio Equalizer"></canvas>
+
+          <div class="progress-row">
+            <div class="slider-track" id="sliderTrack">
+              <div class="slider-fill" id="sliderFill"></div>
+              <input type="range" id="seekSlider" min="0" max="100" value="0" class="invisible-range" aria-label="Seek position" />
+            </div>
+            <div class="time-readout">
+              <span id="currentTime">0:00</span> / <span id="durationTime">3:22</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Transport Controls & Inline Volume -->
+        <div class="pill-controls">
+          <button class="btn-pill-icon" id="btnPrev" title="Previous Track (Left Arrow)" aria-label="Previous Track">
+            <i class="fa-solid fa-backward-step"></i>
+          </button>
+
+          <button class="btn-pill-play" id="btnPlayPause" title="Play / Pause (Spacebar)" aria-label="Play or Pause Track">
+            <i class="fa-solid fa-play" id="playIcon"></i>
+          </button>
+
+          <button class="btn-pill-icon" id="btnNext" title="Next Track (Right Arrow)" aria-label="Next Track">
+            <i class="fa-solid fa-forward-step"></i>
+          </button>
+
+          <div class="volume-inline">
+            <button class="btn-volume" id="btnMute" title="Toggle Mute (M Key)" aria-label="Toggle Mute">
+              <i class="fa-solid fa-volume-high" id="volumeIcon"></i>
+            </button>
+            <div class="volume-track">
+              <div class="volume-fill" id="volumeFill"></div>
+              <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.8" class="invisible-range" aria-label="Volume Level" />
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
