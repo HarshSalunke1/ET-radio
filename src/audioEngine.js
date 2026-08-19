@@ -1,5 +1,5 @@
 /* ==========================================================================
-   EXTRA TIME RADIO — CONTINUOUS AUTOPLAY AUDIO ENGINE
+   EXTRA TIME RADIO — GUARANTEED CONTINUOUS AUTOPLAY AUDIO ENGINE
    ========================================================================== */
 
 import { MOCK_TRACKS } from './mockData.js';
@@ -16,6 +16,7 @@ export class AudioEngine {
     this.currentTrackIndex = Math.floor(Math.random() * this.playlist.length);
     this.isMuted = false;
     this.volume = 0.9;
+    this.isTransitioning = false;
 
     // YouTube Player State
     this.ytPlayer = null;
@@ -168,6 +169,18 @@ export class AudioEngine {
         this.setState('LOADING');
         break;
 
+      case window.YT.PlayerState.CUED:
+      case 5:
+        // Force immediate video playback whenever YouTube cued a track
+        if (this.ytPlayer && this.ytPlayer.playVideo) {
+          try {
+            this.ytPlayer.unMute();
+            this.ytPlayer.setVolume(Math.round(this.volume * 100));
+            this.ytPlayer.playVideo();
+          } catch (e) {}
+        }
+        break;
+
       case window.YT.PlayerState.ENDED:
         // AUTOMATIC NEXT SONG AUTOPLAY WITHOUT USER INTERACTION
         this.nextTrack();
@@ -213,10 +226,6 @@ export class AudioEngine {
         const dur = this.ytPlayer.getDuration() || 0;
         if (this.onTimeUpdate) {
           this.onTimeUpdate(cur, dur);
-        }
-        // Continuous autoplay guard: switch track automatically when song finishes
-        if (dur > 5 && cur >= dur - 0.6) {
-          this.nextTrack();
         }
       }
     }, 400);
@@ -347,18 +356,37 @@ export class AudioEngine {
   }
 
   nextTrack() {
-    if (this.isYtReady && this.ytPlayer && this.ytPlayer.nextVideo) {
+    if (this.isTransitioning) return;
+    this.isTransitioning = true;
+    setTimeout(() => { this.isTransitioning = false; }, 1500);
+
+    if (this.isYtReady && this.ytPlayer) {
       try {
         this.ytPlayer.setShuffle(true);
-        this.ytPlayer.nextVideo();
+        if (typeof this.ytPlayer.nextVideo === 'function') {
+          this.ytPlayer.nextVideo();
+        } else {
+          const randomIndex = Math.floor(Math.random() * 40);
+          this.ytPlayer.playVideoAt(randomIndex);
+        }
+
+        // Force playback on next track
+        setTimeout(() => {
+          if (this.ytPlayer && this.ytPlayer.playVideo) {
+            try {
+              this.ytPlayer.unMute();
+              this.ytPlayer.setVolume(Math.round(this.volume * 100));
+              this.ytPlayer.playVideo();
+            } catch (e) {}
+          }
+        }, 300);
         return;
       } catch (e) {}
     }
+
     const nextIndex = Math.floor(Math.random() * this.playlist.length);
     this.loadTrack(nextIndex);
-    if (this.state === 'PLAYING' || this.state === 'LOADING') {
-      this.playTrack();
-    }
+    this.playTrack();
   }
 
   prevTrack() {
@@ -366,6 +394,13 @@ export class AudioEngine {
       try {
         this.ytPlayer.setShuffle(true);
         this.ytPlayer.previousVideo();
+        setTimeout(() => {
+          if (this.ytPlayer && this.ytPlayer.playVideo) {
+            this.ytPlayer.unMute();
+            this.ytPlayer.setVolume(Math.round(this.volume * 100));
+            this.ytPlayer.playVideo();
+          }
+        }, 300);
         return;
       } catch (e) {}
     }
@@ -375,9 +410,7 @@ export class AudioEngine {
     }
     const prevIndex = Math.floor(Math.random() * this.playlist.length);
     this.loadTrack(prevIndex);
-    if (this.state === 'PLAYING' || this.state === 'LOADING') {
-      this.playTrack();
-    }
+    this.playTrack();
   }
 
   seekTo(seconds) {
