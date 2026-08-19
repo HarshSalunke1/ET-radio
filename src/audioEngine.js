@@ -1,5 +1,5 @@
 /* ==========================================================================
-   EXTRA TIME RADIO — GUARANTEED CONTINUOUS AUTOPLAY AUDIO ENGINE
+   EXTRA TIME RADIO — AUDIO ENGINE (STRICT USER-PAUSE PRIORITY FIX)
    ========================================================================== */
 
 import { MOCK_TRACKS } from './mockData.js';
@@ -9,8 +9,11 @@ export class AudioEngine {
     this.canvas = document.getElementById(canvasElementId);
     this.canvasCtx = this.canvas ? this.canvas.getContext('2d') : null;
 
-    // State machine: IDLE | LOADING | PLAYING | PAUSED | ERROR | BLOCKED_AUTOPLAY
+    // State machine: IDLE | LOADING | PLAYING | PAUSED | ERROR
     this.state = 'IDLE';
+    this.isUserPaused = false; // Strict User Pause Priority Flag
+    this.hasInitialAutoplayAttempted = false;
+
     this.currentMood = 'pre-match';
     this.playlist = MOCK_TRACKS['pre-match'];
     this.currentTrackIndex = Math.floor(Math.random() * this.playlist.length);
@@ -44,19 +47,19 @@ export class AudioEngine {
     this.initGlobalUnmuteListeners();
   }
 
-  /* Instant unmute on any cursor movement, tap, scroll, or gesture */
+  /* Unmute handler for initial user interaction (NEVER overrides isUserPaused) */
   initGlobalUnmuteListeners() {
     const unmuteHandler = () => {
       const enterBtn = document.getElementById('enterRadioBtn');
       if (enterBtn) enterBtn.style.display = 'none';
 
+      // If the user manually paused, DO NOT auto-resume on mousemove/scroll!
+      if (this.isUserPaused) return;
+
       if (this.ytPlayer) {
         try {
           if (this.ytPlayer.unMute) this.ytPlayer.unMute();
           if (this.ytPlayer.setVolume) this.ytPlayer.setVolume(Math.round(this.volume * 100));
-          if (this.ytPlayer.playVideo && this.state !== 'PLAYING') {
-            this.ytPlayer.playVideo();
-          }
         } catch (e) {}
       }
       if (this.audio) {
@@ -72,7 +75,7 @@ export class AudioEngine {
   }
 
   /* ------------------------------------------------------------------------
-     1. YOUTUBE IFRAME API INTEGRATION WITH ENDLESS CONTINUOUS AUTOPLAY
+     1. YOUTUBE IFRAME API INTEGRATION
      ------------------------------------------------------------------------ */
 
   initYouTubeAPI() {
@@ -143,8 +146,12 @@ export class AudioEngine {
       });
 
       this.ytPlayer.setShuffle(true);
-      this.ytPlayer.mute();
-      this.ytPlayer.playVideo();
+
+      // Only autoplay if user has NOT manually paused
+      if (!this.isUserPaused) {
+        this.ytPlayer.mute();
+        this.ytPlayer.playVideo();
+      }
     } catch (e) {}
 
     this.startYtProgressPoll();
@@ -155,12 +162,14 @@ export class AudioEngine {
 
     switch (event.data) {
       case window.YT.PlayerState.PLAYING:
+        console.log('[ET RADIO] play');
         this.setState('PLAYING');
         this.updateYtTrackInfo();
         this.startWaveform();
         break;
 
       case window.YT.PlayerState.PAUSED:
+        console.log('[ET RADIO] pause');
         this.setState('PAUSED');
         this.drawWaveform();
         break;
@@ -171,8 +180,8 @@ export class AudioEngine {
 
       case window.YT.PlayerState.CUED:
       case 5:
-        // Force immediate video playback whenever YouTube cued a track
-        if (this.ytPlayer && this.ytPlayer.playVideo) {
+        // Only force playback if user has NOT manually paused
+        if (!this.isUserPaused && this.ytPlayer && this.ytPlayer.playVideo) {
           try {
             this.ytPlayer.unMute();
             this.ytPlayer.setVolume(Math.round(this.volume * 100));
@@ -182,15 +191,19 @@ export class AudioEngine {
         break;
 
       case window.YT.PlayerState.ENDED:
-        // AUTOMATIC NEXT SONG AUTOPLAY WITHOUT USER INTERACTION
-        this.nextTrack();
+        console.log('[ET RADIO] natural track ended');
+        if (!this.isUserPaused) {
+          this.nextTrack();
+        }
         break;
     }
   }
 
   onYtPlayerError(event) {
-    console.warn('YouTube Player error code:', event.data, 'Switching to next track automatically');
-    this.nextTrack();
+    console.warn('[ET RADIO] autoplay blocked / YouTube error code:', event.data);
+    if (!this.isUserPaused) {
+      this.nextTrack();
+    }
   }
 
   updateYtTrackInfo() {
@@ -246,14 +259,16 @@ export class AudioEngine {
       }
     });
 
-    // AUTOMATIC NEXT SONG AUTOPLAY ON TRACK END WITHOUT USER INTERACTION
     this.audio.addEventListener('ended', () => {
-      this.nextTrack();
+      console.log('[ET RADIO] natural track ended');
+      if (!this.isUserPaused) {
+        this.nextTrack();
+      }
     });
 
     this.audio.addEventListener('error', (e) => {
       console.warn('Audio stream error, engaging ambient synth fallback:', e);
-      if (this.state === 'PLAYING' || this.state === 'LOADING') {
+      if (!this.isUserPaused && (this.state === 'PLAYING' || this.state === 'LOADING')) {
         this.startSyntheticSynth();
       }
     });
@@ -295,10 +310,13 @@ export class AudioEngine {
   }
 
   /* ------------------------------------------------------------------------
-     3. UNIFIED PLAYBACK CONTROLS
+     3. UNIFIED PLAYBACK CONTROLS (USER PAUSE ALWAYS HAS PRIORITY)
      ------------------------------------------------------------------------ */
 
   async playTrack() {
+    // User explicitly triggered play
+    this.isUserPaused = false;
+
     this.initWebAudio();
     if (this.audioCtx && this.audioCtx.state === 'suspended') {
       try { await this.audioCtx.resume(); } catch (e) {}
@@ -325,7 +343,7 @@ export class AudioEngine {
 
     // 2. HTML5 Audio Playback
     try {
-      this.audio.muted = true;
+      this.audio.muted = false;
       const playPromise = this.audio.play();
       if (playPromise !== undefined) {
         await playPromise;
@@ -339,6 +357,10 @@ export class AudioEngine {
   }
 
   pauseTrack() {
+    // User explicitly pressed pause
+    this.isUserPaused = true;
+    console.log('[ET RADIO] user clicked pause -> setting isUserPaused = true');
+
     if (this.isYtReady && this.ytPlayer && this.ytPlayer.pauseVideo) {
       try { this.ytPlayer.pauseVideo(); } catch (e) {}
     }
@@ -360,6 +382,8 @@ export class AudioEngine {
     this.isTransitioning = true;
     setTimeout(() => { this.isTransitioning = false; }, 1500);
 
+    const wasPlaying = (this.state === 'PLAYING');
+
     if (this.isYtReady && this.ytPlayer) {
       try {
         this.ytPlayer.setShuffle(true);
@@ -370,37 +394,58 @@ export class AudioEngine {
           this.ytPlayer.playVideoAt(randomIndex);
         }
 
-        // Force playback on next track
-        setTimeout(() => {
-          if (this.ytPlayer && this.ytPlayer.playVideo) {
-            try {
-              this.ytPlayer.unMute();
-              this.ytPlayer.setVolume(Math.round(this.volume * 100));
-              this.ytPlayer.playVideo();
-            } catch (e) {}
-          }
-        }, 300);
+        // Only resume playback if it WAS playing and user has NOT paused
+        if (wasPlaying && !this.isUserPaused) {
+          setTimeout(() => {
+            if (this.ytPlayer && this.ytPlayer.playVideo && !this.isUserPaused) {
+              try {
+                this.ytPlayer.unMute();
+                this.ytPlayer.setVolume(Math.round(this.volume * 100));
+                this.ytPlayer.playVideo();
+              } catch (e) {}
+            }
+          }, 300);
+        } else if (this.isUserPaused) {
+          setTimeout(() => {
+            if (this.ytPlayer && this.ytPlayer.pauseVideo) {
+              try { this.ytPlayer.pauseVideo(); } catch (e) {}
+            }
+          }, 300);
+        }
         return;
       } catch (e) {}
     }
 
     const nextIndex = Math.floor(Math.random() * this.playlist.length);
     this.loadTrack(nextIndex);
-    this.playTrack();
+    if (wasPlaying && !this.isUserPaused) {
+      this.playTrack();
+    }
   }
 
   prevTrack() {
+    const wasPlaying = (this.state === 'PLAYING');
+
     if (this.isYtReady && this.ytPlayer && this.ytPlayer.previousVideo) {
       try {
         this.ytPlayer.setShuffle(true);
         this.ytPlayer.previousVideo();
-        setTimeout(() => {
-          if (this.ytPlayer && this.ytPlayer.playVideo) {
-            this.ytPlayer.unMute();
-            this.ytPlayer.setVolume(Math.round(this.volume * 100));
-            this.ytPlayer.playVideo();
-          }
-        }, 300);
+
+        if (wasPlaying && !this.isUserPaused) {
+          setTimeout(() => {
+            if (this.ytPlayer && this.ytPlayer.playVideo && !this.isUserPaused) {
+              this.ytPlayer.unMute();
+              this.ytPlayer.setVolume(Math.round(this.volume * 100));
+              this.ytPlayer.playVideo();
+            }
+          }, 300);
+        } else if (this.isUserPaused) {
+          setTimeout(() => {
+            if (this.ytPlayer && this.ytPlayer.pauseVideo) {
+              try { this.ytPlayer.pauseVideo(); } catch (e) {}
+            }
+          }, 300);
+        }
         return;
       } catch (e) {}
     }
@@ -410,7 +455,9 @@ export class AudioEngine {
     }
     const prevIndex = Math.floor(Math.random() * this.playlist.length);
     this.loadTrack(prevIndex);
-    this.playTrack();
+    if (wasPlaying && !this.isUserPaused) {
+      this.playTrack();
+    }
   }
 
   seekTo(seconds) {
@@ -431,7 +478,7 @@ export class AudioEngine {
 
     if (this.isYtReady && this.ytPlayer && this.ytPlayer.setVolume) {
       try {
-        if (targetVol > 0) this.ytPlayer.unMute();
+        if (targetVol > 0 && !this.isUserPaused) this.ytPlayer.unMute();
         this.ytPlayer.setVolume(Math.round(targetVol * 100));
       } catch (e) {}
     }
@@ -448,15 +495,23 @@ export class AudioEngine {
     return this.isMuted;
   }
 
+  /* 3-Second Initial Autoplay Attempt (Obeys isUserPaused strictly) */
   scheduleAutoplay() {
+    console.log('[ET RADIO] initial autoplay attempt scheduled in 3s');
     setTimeout(() => {
-      this.playTrack();
-    }, 2000);
+      if (!this.hasInitialAutoplayAttempted && !this.isUserPaused) {
+        this.hasInitialAutoplayAttempted = true;
+        console.log('[ET RADIO] initial autoplay attempt running');
+        this.playTrack();
+      } else {
+        console.log('[ET RADIO] initial autoplay skipped because user paused or already attempted');
+      }
+    }, 3000);
   }
 
   /* Synthetic Audio Fallback */
   startSyntheticSynth() {
-    if (!this.audioCtx) return;
+    if (!this.audioCtx || this.isUserPaused) return;
     try {
       this.stopSyntheticSynth();
 
@@ -531,7 +586,7 @@ export class AudioEngine {
         const wave = Math.sin(time * 2.2 + i * 0.35) * Math.cos(time * 1.4 + i * 0.18);
         barH = Math.max(2.5, Math.abs(wave) * (h * 0.85) + 2);
       } else {
-        barH = 2.5; // Frozen static low opacity state when paused
+        barH = 2.5; // Frozen static state when paused
       }
       const x = i * (barW + gap);
       const y = (h - barH) / 2;
