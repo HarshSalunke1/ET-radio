@@ -4,12 +4,16 @@
 
 import { MOCK_TRACKS } from './mockData.js';
 
+/**
+ * AudioEngine manages state, YouTube IFrame API playback, 
+ * HTML5 audio fallbacks, and live equalizer canvas rendering.
+ */
 export class AudioEngine {
   constructor(canvasElementId) {
     this.canvas = document.getElementById(canvasElementId);
     this.canvasCtx = this.canvas ? this.canvas.getContext('2d') : null;
 
-    // State machine: IDLE | LOADING | PLAYING | PAUSED | ERROR
+    // Playback state machine: IDLE | LOADING | PLAYING | PAUSED | ERROR
     this.state = 'IDLE';
     this.isUserPaused = false; // Set to true ONLY when user clicks Pause
     this.hasInitialAutoplayAttempted = false;
@@ -21,7 +25,7 @@ export class AudioEngine {
     this.volume = 0.9;
     this.isTransitioning = false;
 
-    // YouTube Player State
+    // YouTube Player State Configuration
     this.ytPlayer = null;
     this.isYtReady = false;
     this.playlistId = 'PLZHNkTV1FW4c'; 
@@ -35,7 +39,7 @@ export class AudioEngine {
     this.synthGain = null;
     this.animationFrameId = null;
 
-    // Callbacks
+    // Event Callbacks
     this.onTrackChange = null;
     this.onStateChange = null;
     this.onTimeUpdate = null;
@@ -47,7 +51,10 @@ export class AudioEngine {
     this.initGlobalUnmuteListeners();
   }
 
-  /* Unmute and trigger playback on initial site open/gesture (Blocked when isUserPaused is true) */
+  /**
+   * Unmute and trigger playback on initial site open or user gesture.
+   * Strictly respects isUserPaused flag so manual pauses are never overridden.
+   */
   initGlobalUnmuteListeners() {
     const unmuteHandler = () => {
       const enterBtn = document.getElementById('enterRadioBtn');
